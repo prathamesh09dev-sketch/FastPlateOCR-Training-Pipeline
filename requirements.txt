@@ -1,0 +1,54 @@
+# ── Indian License Plate OCR — Requirements ───────────────────
+# Project: Daheri Toll Plaza ANPR System
+# Python: 3.12
+# Install: pip install -r requirements.txt
+#
+# NOTE: GPU (RTX 5060 sm_120) not yet supported by these frameworks.
+#       All training runs on CPU. See README_SCRIPTS.md for GPU workarounds.
+# ──────────────────────────────────────────────────────────────
+
+# ── fast-plate-ocr (OCR Model) ─────────────────────────────────
+# Training dependencies (keras, tensorflow, albumentations, etc.)
+fast-plate-ocr[train]==1.1.0
+# Inference runtime (ONNX)
+fast-plate-ocr[onnx]==1.1.0
+
+# ── YOLO Detector ──────────────────────────────────────────────
+ultralytics
+
+# ── PaddleOCR ──────────────────────────────────────────────────
+# CPU version — for GPU (if sm_120 gets supported):
+# pip install paddlepaddle-gpu -f https://github.com/horhe-dvlp/paddlepaddle-sm120-wheels/releases
+paddlepaddle==3.0.0
+paddleocr
+
+# ── Image Processing ───────────────────────────────────────────
+opencv-python-headless
+Pillow
+
+# ── Data Handling ──────────────────────────────────────────────
+pandas
+numpy
+
+# ── Training Dependencies (installed via fast-plate-ocr[train]) ─
+# Listed here explicitly for reference
+tensorflow==2.21.0
+keras==3.14.0
+albumentations==2.0.8
+scikit-learn
+matplotlib
+tensorboard
+tf2onnx
+onnx
+onnxslim
+ai-edge-litert
+coremltools
+pyyaml>=5.1
+click
+rich
+tqdm
+pydantic>=2.5.2
+
+# ── Utilities ──────────────────────────────────────────────────
+tqdm
+requests

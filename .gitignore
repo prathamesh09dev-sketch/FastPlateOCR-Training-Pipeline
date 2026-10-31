@@ -1,0 +1,107 @@
+# ==============================================================================
+# Byte-compiled / optimized / Python runtime
+# ==============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ==============================================================================
+# Virtual Environments
+# ==============================================================================
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# ==============================================================================
+# Model Weights, Checkpoints & Exported Models (Large Binaries)
+# ==============================================================================
+*.keras
+*.h5
+*.hdf5
+*.onnx
+*.pt
+*.pth
+*.tflite
+*.pb
+*.weights
+*.ckpt
+*.safetensors
+cct_s_v2_global.keras
+
+# ==============================================================================
+# Training Runs, Logs & Checkpoints
+# ==============================================================================
+logs/
+checkpoints/
+wandb/
+*.log
+
+# ==============================================================================
+# Dataset Image Directories & Raw Media
+# ==============================================================================
+all_types_data/
+fastplate_data/
+tight_crop_training_data/
+training_data/
+Snapshots/
+Snapshots_tight_crop/
+
+# Generic image files (untracked dataset crops/snapshots)
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.tiff
+*.webp
+
+# ==============================================================================
+# Temporary / Data Extraction Logs
+# ==============================================================================
+failed_extraction.txt
+
+# ==============================================================================
+# Jupyter Notebooks & Caches
+# ==============================================================================
+.ipynb_checkpoints
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ==============================================================================
+# Environment Variables & Secrets
+# ==============================================================================
+.env
+.env.*
+!.env.example
+
+# ==============================================================================
+# OS & Editor Specific Files
+# ==============================================================================
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

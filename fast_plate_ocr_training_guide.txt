@@ -1,0 +1,190 @@
+Step 0:
+        Create Virtual Environment
+	python -m venv venv
+	source venv/bin/activate          # Linux/Mac
+	# OR on Windows:
+	venv\Scripts\activate
+	
+	pip install -r requirements.txt
+	
+	
+	Verify Installation
+	# fast-plate-ocr CLI (IMPORTANT: use hyphens not underscores)
+	fast-plate-ocr --help
+	# PaddleOCR
+	python -c "from paddleocr import PaddleOCR; print('PaddleOCR OK')"
+	# fast-plate-ocr inference
+	python -c "from fast_plate_ocr import LicensePlateRecognizer; print('fast-plate-ocr OK')"
+
+
+	GPU Note (RTX 5060 sm_120)
+	Your RTX 5060 has compute capability 12.0 (sm_120). Neither TensorFlow nor PaddlePaddle officially support this yet. All training runs on CPU. To check:
+
+	nvidia-smi                                                    # Shows GPU exists
+	python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"  # Will show []
+
+
+Step 1:
+	Purpose: anpr images size convert into license plate crop size
+	Input: Ex: Snapshots/ (anpr image path)  Output: Ex: tight_crop_training_data/ (you can changed a folder name )
+  
+	run:
+	prepare_snapshots_tight_crop.py
+  
+  
+Step 2: 
+	Data Preparation Scripts
+
+	Script 1: extract_labels_from_filenames.py
+	Purpose: Extracts plate text from image filenames automatically. Your filenames contain the plate text, e.g., lane_4_UP65CF3993_20260217_092439.jpg → UP65CF3993
+
+	Input: tight_crop_training_data/ (raw images) Output: labels.csv (columns: filename, plate_text)
+
+	python extract_labels_from_filenames.py
+	Expected output:
+
+	Processing 10000 images...
+	Extracted: 9478/10000 (94.8%)
+	Failed:    522
+	All 522 failures saved to failed_extraction.txt
+	What the script does:
+
+	Splits filename by underscore (_)
+	Checks each chunk against HSRP regex: ^[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{1,4}$
+	Checks each chunk against BH regex: ^\d{2}BH\d{4}[A-Z]{1,2}$
+	Saves matched chunk as the plate label
+	If extraction rate is low: check failed_extraction.txt — filenames may use a different pattern.    
+
+
+	Script 2: split_dataset.py
+	Purpose: Splits labeled data into train (80%), val (10%), test (10%) sets.
+
+	Input: labels.csv Output: splits/train.csv, splits/val.csv, splits/test.csv
+
+	python split_dataset.py
+	Expected output:
+
+	Total labeled samples: 7478
+	  HSRP plates: 7400
+	  BH plates:   78
+	Unique characters (36): ['0','1',...,'Z']
+
+	train: 5982 samples → splits/train.csv
+	val:   748 samples  → splits/val.csv
+	test:  748 samples  → splits/test.csv
+	Important checks:
+
+	Unique characters should be exactly 36 (0-9, A-Z)
+	If you see lowercase or symbols → labels were extracted wrong
+	BH count < 100 → model will underperform on BH plates (acceptable for now)
+	
+	
+	Script 3: convert_to_fastplate_format.py
+	Purpose: Copies images into split-specific folders and creates annotation CSVs for fast-plate-ocr training.
+
+	Input: splits/*.csv + tight_crop_training_data/ Output: fastplate_data/{train,val,test}/{images/, annotations.csv}
+
+	python convert_to_fastplate_format.py
+	Expected output:
+
+	train: 5982 samples → fastplate_data/train/annotations.csv
+	val:   748 samples  → fastplate_data/val/annotations.csv
+	test:  748 samples  → fastplate_data/test/annotations.csv
+	Done. Data structured for fast-plate-ocr training.
+	
+	
+	Script 4: fix_csv_columns.py ⚠️ CRITICAL
+	Purpose: Fixes CSV column names to exactly what fast-plate-ocr v1.1.0 expects.
+
+	Why needed: fast-plate-ocr requires EXACTLY image_path and plate_text as column names. Also, paths must be relative (images/filename.jpg) not absolute.
+
+	Input: fastplate_data/{split}/annotations.csv Output: Same files, corrected in-place
+
+	python fix_csv_columns.py
+	Verify after running:
+
+	head -3 fastplate_data/train/annotations.csv
+	Must show:
+
+	image_path,plate_text
+	images/lane_4_UP65CF3993_20260217_092439.jpg,UP65CF3993
+	images/lane_1_BR24GD2995_20260108_154911.jpg,BR24GD2995
+	If this is wrong, training WILL crash. This is the #1 source of training errors.
+
+	Wrong column name	Error you'll see
+	image instead of image_path	KeyError: 'image_path'
+	label instead of plate_text	KeyError: 'plate_text'
+	Absolute path in image_path	FileNotFoundError with doubled path
+	Missing images/ prefix	FileNotFoundError
+
+Step 3: 
+	fast-plate-ocr Training Scripts
+	
+	4.1 Create Config Files
+	plate_config.yaml — tells the model about your plate format:
+
+	max_plate_slots: 10
+alphabet: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_'
+pad_char: '_'
+img_height: 64
+img_width: 128
+keep_aspect_ratio: true
+interpolation: area
+image_color_mode: rgb
+
+	
+	⚠️ Dimensions MUST be 64x128 to match pretrained model. Changing this requires training from scratch.
+
+	Download model architecture config:
+	curl -L "https://github.com/ankandrew/fast-plate-ocr/releases/download/arg-plates/cct_s_v2_global_model_config.yaml" -o cct_s_v2_model_config.yaml
+       
+	check
+	ls -lh cct_s_v2_model_config.yaml
+	  
+	  
+	4.2 Download Pretrained Weights
+	# Method 1: Python hub (most reliable)
+	python -c "from fast_plate_ocr import LicensePlateRecognizer; m = LicensePlateRecognizer('cct-s-v2-global-model'); print('Downloaded.')"
+
+	find / -name "*.keras" 2>/dev/null
+	cp /path/from/above/model.keras cct_s_v2_global_model.keras
+
+	# Verify file is valid (must say 'Zip archive data', NOT 'HTML document')
+	file cct_s_v2_global_model.keras
+
+      
+      	4.3 Train fast-plate-ocr (GPU)
+             run: 
+PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
+KERAS_BACKEND=torch \
+fast-plate-ocr train \
+  --model-config-file cct_s_v2_model_config.yaml \
+  --plate-config-file plate_config.yaml \
+  --annotations fastplate_data/train/annotations.csv \
+  --val-annotations fastplate_data/val/annotations.csv \
+  --weights-path cct_s_v2_global.keras \
+  --batch-size 16 \
+  --epochs 150 \
+  --lr 5e-4 \
+  --use-ema \
+  --early-stopping-patience 40 \
+  --early-stopping-metric val_plate_acc \
+  --workers 1 \
+  --output-dir runs/indian_plates_v1_tight
+		  
+		  
+	Run inside tmux to survive SSH disconnects:
+
+	tmux new -s fastplate
+	# run command above
+	# Detach: Ctrl+B then D
+	# Reattach: tmux attach -t fastplate
+	Expected time: 4-8 hours on CPU Watch for: val_plate_acc increasing each epoch. Target: >90% by epoch 30.
+
+	Training output location: runs/indian_plates_v1/best_model.keras
+
+	4.4 Export to ONNX (required for inference)
+	fast-plate-ocr export \
+	  --model-path runs/indian_plates_v1/best_model.keras \
+	  --output-format onnx \
+	  --output-path runs/indian_plates_v1/best_model.onnx
